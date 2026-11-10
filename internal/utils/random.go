@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"unicode"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -19,4 +20,16 @@ func RandomString(length int) string {
 	}
 
 	return string(b)
+}
+
+func MixCase(s string) string {
+	runes := []rune(s)
+	for i := range runes {
+		if i%2 == 0 {
+			runes[i] = unicode.ToUpper(runes[i])
+		} else {
+			runes[i] = unicode.ToLower(runes[i])
+		}
+	}
+	return string(runes)
 }
