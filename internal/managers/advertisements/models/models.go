@@ -1,5 +1,22 @@
 package models
 
+type CreateAdvertisementResponse struct {
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	Quantity    int     `json:"quantity"`
+	UserID      string  `json:"user_id"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+	Photos      []Photo `json:"photos"`
+}
+
+type ErrorResponse struct {
+	Details string `json:"details"`
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
 type Photo struct {
 	AdvertisementID string `json:"advertisement_id"`
 	CreatedAt       string `json:"created_at"`
@@ -23,7 +40,7 @@ type Advertisement struct {
 	Description string  `json:"description"`
 	ID          string  `json:"id"`
 	Photos      []Photo `json:"photos"`
-	Price       int     `json:"price"`
+	Price       float64 `json:"price"`
 	Quantity    int     `json:"quantity"`
 	Title       string  `json:"title"`
 	UpdatedAt   string  `json:"updated_at"`
