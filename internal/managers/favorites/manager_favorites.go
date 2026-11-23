@@ -1,8 +1,6 @@
 package favorites
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 	"testing"
 
@@ -13,6 +11,7 @@ import (
 	"api-tests-template/internal/utils"
 )
 
+// AddFavorite добавляет объявление в избранное пользователя.
 func AddFavorite(t *testing.T, token, adID string) {
 	raw := favorites.HttpPostFavorite(t, token, adID)
 	defer raw.Body.Close()
@@ -21,21 +20,19 @@ func AddFavorite(t *testing.T, token, adID string) {
 		"Ожидался статус 201 при добавлении в избранное")
 }
 
+// GetFavorites возвращает список избранных объявлений пользователя.
 func GetFavorites(t *testing.T, token string) models.FavoritesList {
 	raw := favorites.HttpGetFavorites(t, token)
-	defer raw.Body.Close()
 
 	require.Equal(t, http.StatusOK, raw.StatusCode,
 		"Ожидался статус 200 при получении избранного")
 
-	body, err := io.ReadAll(raw.Body)
-	require.NoError(t, err)
-
 	var resp models.FavoritesList
-	require.NoError(t, json.Unmarshal(body, &resp))
+	utils.DecodeJSONResponse(t, raw, &resp)
 	return resp
 }
 
+// DeleteFavorite удаляет объявление из избранного.
 func DeleteFavorite(t *testing.T, token, adID string) {
 	raw := favorites.HttpDeleteFavorite(t, token, adID)
 	defer raw.Body.Close()

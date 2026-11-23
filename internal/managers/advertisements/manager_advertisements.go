@@ -1,86 +1,72 @@
 package advertisements
 
 import (
-	"encoding/json"
-	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"api-tests-template/internal/client/http/advertisements"
 	"api-tests-template/internal/managers/advertisements/models"
-	"net/http"
+	"api-tests-template/internal/utils"
 )
 
+// GetAdvertisementsList возвращает список объявлений по текстовому поиску.
 func GetAdvertisementsList(t *testing.T, token, text string) models.AdvertisementsList {
-	rawResponse := advertisements.HttpGetAdvertisements(t, token, text)
-	defer rawResponse.Body.Close()
-
-	respArray, errResponse := io.ReadAll(rawResponse.Body)
-	require.NoError(t, errResponse)
+	raw := advertisements.HttpGetAdvertisements(t, token, text)
 
 	var list models.AdvertisementsList
-	err := json.Unmarshal(respArray, &list)
-	require.NoError(t, err)
-
+	utils.DecodeJSONResponse(t, raw, &list)
 	return list
 }
+
+// CreateAdvertisement создает объявление и возвращает ответ с его данными.
 func CreateAdvertisement(t *testing.T, token, title, desc string, price float64, photoPath string) models.CreateAdvertisementResponse {
 	raw := advertisements.HttpPostAdvertisement(t, token, title, desc, price, photoPath)
-	defer raw.Body.Close()
 
 	require.Equal(t, http.StatusCreated, raw.StatusCode, "Ожидался статус 201 при создании объявления")
 
-	body, err := io.ReadAll(raw.Body)
-	require.NoError(t, err)
-
 	var resp models.CreateAdvertisementResponse
-	require.NoError(t, json.Unmarshal(body, &resp))
+	utils.DecodeJSONResponse(t, raw, &resp)
 	require.NotEmpty(t, resp.ID, "ID созданного объявления пуст")
 
 	return resp
 }
+
+// GetAdvertisementByID возвращает детальную информацию об объявлении по его ID.
 func GetAdvertisementByID(t *testing.T, token, id string) models.Advertisement {
 	raw := advertisements.HttpGetAdvertisementByID(t, token, id)
-	defer raw.Body.Close()
 
 	require.Equal(t, http.StatusOK, raw.StatusCode, "Ожидался статус 200 при получении объявления")
 
-	body, err := io.ReadAll(raw.Body)
-	require.NoError(t, err)
-
 	var resp models.Advertisement
-	require.NoError(t, json.Unmarshal(body, &resp))
-
+	utils.DecodeJSONResponse(t, raw, &resp)
 	return resp
 }
+
+// GetAdvertisementPhotos возвращает список фотографий для указанного объявления.
 func GetAdvertisementPhotos(t *testing.T, token, id string) []models.Photo {
 	raw := advertisements.HttpGetAdvertisementPhotos(t, token, id)
-	defer raw.Body.Close()
 
 	require.Equal(t, http.StatusOK, raw.StatusCode, "Ожидался статус 200 при получении фото")
 
-	body, err := io.ReadAll(raw.Body)
-	require.NoError(t, err)
-
 	var resp []models.Photo
-	require.NoError(t, json.Unmarshal(body, &resp))
-
+	utils.DecodeJSONResponse(t, raw, &resp)
 	return resp
 }
 
+// ParseErrorResponse читает и парсит тело ответа в структуру ErrorResponse.
 func ParseErrorResponse(t *testing.T, raw *http.Response) models.ErrorResponse {
-	defer raw.Body.Close()
-	body, err := io.ReadAll(raw.Body)
-	require.NoError(t, err)
-
 	var errResp models.ErrorResponse
-	require.NoError(t, json.Unmarshal(body, &errResp))
+	utils.DecodeJSONResponse(t, raw, &errResp)
 	return errResp
 }
+
+// DeleteAdvertisement удаляет объявление по ID.
 func DeleteAdvertisement(t *testing.T, token, id string) {
 	raw := advertisements.HttpDeleteAdvertisement(t, token, id)
 	defer raw.Body.Close()
+
 	require.Contains(t, []int{http.StatusOK, http.StatusNoContent}, raw.StatusCode,
-		"Ожидался успешный статус 204 при удалении объявления. Тело ответа: %s")
+		"Ожидался успешный статус 204 при удалении объявления")
 }

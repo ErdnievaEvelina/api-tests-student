@@ -10,6 +10,7 @@ import (
 
 	adClient "api-tests-template/internal/client/http/advertisements"
 	adManager "api-tests-template/internal/managers/advertisements"
+	adModels "api-tests-template/internal/managers/advertisements/models"
 	"api-tests-template/internal/managers/auth"
 	"api-tests-template/internal/managers/auth/models"
 	"api-tests-template/internal/utils"
@@ -39,10 +40,12 @@ func (s *TestSuite) TearDownSuite() {
 // Positive: Создание объявления и проверка через GET /advertisement, поиск и фото
 func (s *TestSuite) TestCreateAdvertisementPositive() {
 	var adID string
+	var created adModels.CreateAdvertisementResponse
 	title := "Test Ad " + utils.RandomString(10)
 	desc := scenario.TestDesc
 	price := scenario.DefaultPrice
 	photoPath := scenario.PhotoPath
+	qty := scenario.Qty
 	defer func() {
 		if adID != "" {
 			utils.LogWithLabelAndTimeStamp("TearDown", "Удаляем тестовое объявление "+adID)
@@ -54,10 +57,13 @@ func (s *TestSuite) TestCreateAdvertisementPositive() {
 		utils.LogWithLabelAndTimeStamp("Step", "Создание объявления с title="+title)
 		resp := adManager.CreateAdvertisement(s.T(), s.loginData.Token, title, desc, price, photoPath)
 		adID = resp.ID
+		created = resp
 		utils.LogWithLabelAndTimeStamp("Check", "Объявление создано с ID="+resp.ID)
 		require.Equal(s.T(), title, resp.Title, "Title полученного объявления не совпадает")
 		require.Equal(s.T(), desc, resp.Description, "Description полученного объявления не совпадает")
 		require.Equal(s.T(), price, resp.Price, "Price полученного объявления не совпадает")
+		require.Equal(s.T(), qty, resp.Quantity, "Quantity полученного объявления не совпадает")
+		require.NotEmpty(s.T(), resp.Photos, "В ответе создания должно быть фото")
 	})
 
 	s.Run("Проверяем через GET /advertisement?id={id}", func() {
@@ -68,6 +74,7 @@ func (s *TestSuite) TestCreateAdvertisementPositive() {
 		require.Equal(s.T(), title, ad.Title, "Title полученного объявления не совпадает")
 		require.Equal(s.T(), desc, ad.Description, "Description полученного объявления не совпадает")
 		require.Equal(s.T(), price, ad.Price, "Price полученного объявления не совпадает")
+		require.Equal(s.T(), qty, ad.Quantity, "Quantity полученного объявления не совпадает")
 	})
 
 	s.Run("Проверяем, что объявление есть в поиске по названию", func() {
@@ -87,7 +94,20 @@ func (s *TestSuite) TestCreateAdvertisementPositive() {
 	s.Run("Проверяем доступность фото через GET /advertisements/{id}/photos", func() {
 		utils.LogWithLabelAndTimeStamp("Step", "Проверка доступности фото")
 		photos := adManager.GetAdvertisementPhotos(s.T(), s.loginData.Token, adID)
-		require.NotEmpty(s.T(), photos, "Список фото не должен быть пустым, так как мы загрузили файл")
+		require.NotEmpty(s.T(), photos, "Список фото не должен быть пустым")
+		ad := adManager.GetAdvertisementByID(s.T(), s.loginData.Token, adID)
+		require.Equal(s.T(), len(created.Photos), len(photos),
+			"Количество фото в ответе создания и GET /photos не совпадает")
+
+		createdIDs := map[string]bool{}
+		for _, p := range created.Photos {
+			createdIDs[p.ID] = true
+		}
+		for _, p := range photos {
+			require.True(s.T(), createdIDs[p.ID],
+				"ID фото %s отсутствует в ответе создания", p.ID)
+		}
+		require.Equal(s.T(), len(ad.Photos), len(photos), "Количество фото в GET /advertisement и GET /photos не совпадает")
 	})
 }
 
@@ -97,18 +117,20 @@ func (s *TestSuite) TestCreateAdvertisementNegative() {
 
 	s.Run("Пустой title", func() {
 		raw := adClient.HttpPostAdvertisement(s.T(), s.loginData.Token, "", "desc", 100.0, photoPath)
-		require.Equal(s.T(), http.StatusBadRequest, raw.StatusCode)
+		require.Equal(s.T(), http.StatusBadRequest, raw.StatusCode, "Ожидалась ошибка валидации (400)")
 
 		errResp := adManager.ParseErrorResponse(s.T(), raw)
-		require.NotEmpty(s.T(), errResp.Message)
+		require.Equal(s.T(), "title is required", errResp.Message, "Ожидается title is required")
+		require.Equal(s.T(), "invalid_request", errResp.Error, "Ожидается invalid_request")
 	})
 
 	s.Run("Отрицательная цена", func() {
 		raw := adClient.HttpPostAdvertisement(s.T(), s.loginData.Token, "Valid "+utils.RandomString(5), "desc", -10.0, photoPath)
-		require.Equal(s.T(), http.StatusBadRequest, raw.StatusCode)
+		require.Equal(s.T(), http.StatusBadRequest, raw.StatusCode, "Ожидалась ошибка валидации (400)")
 
 		errResp := adManager.ParseErrorResponse(s.T(), raw)
-		require.NotEmpty(s.T(), errResp.Message)
+		require.Equal(s.T(), "price must be between 0 and 1000000 inclusive", errResp.Message, "Ожидается price must be between 0 and 1000000 inclusive")
+		require.Equal(s.T(), "invalid_request", errResp.Error, "Ожидается invalid_request")
 	})
 }
 
@@ -118,14 +140,18 @@ func (s *TestSuite) TestCreateAdvertisementUnauthorized() {
 
 	s.Run("Без токена", func() {
 		raw := adClient.HttpPostAdvertisement(s.T(), "", "Test", "Desc", 100.0, photoPath)
-		require.Equal(s.T(), http.StatusUnauthorized, raw.StatusCode)
+		require.Equal(s.T(), http.StatusUnauthorized, raw.StatusCode, "Ожидалась ошибка авторизации (401)")
 
 		errResp := adManager.ParseErrorResponse(s.T(), raw)
-		require.Equal(s.T(), "unauthorized", errResp.Error)
+		require.Equal(s.T(), "unauthorized", errResp.Error, "Ожидался unauthorized")
+		require.Contains(s.T(), "Authorization header required", errResp.Message)
 	})
 
 	s.Run("С неверным токеном", func() {
 		raw := adClient.HttpPostAdvertisement(s.T(), "invalid_token", "Test", "Desc", 100.0, photoPath)
-		require.Equal(s.T(), http.StatusUnauthorized, raw.StatusCode)
+		errResp := adManager.ParseErrorResponse(s.T(), raw)
+		require.Equal(s.T(), http.StatusUnauthorized, raw.StatusCode, "Ожидалась ошибка авторизации (401)")
+		require.Equal(s.T(), "unauthorized", errResp.Error, "Ожидался unauthorized")
+		require.Contains(s.T(), "Invalid or expired token", errResp.Message, "Ожидался Invalid or expired token")
 	})
 }

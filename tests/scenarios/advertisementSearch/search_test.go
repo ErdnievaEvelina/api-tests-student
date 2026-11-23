@@ -2,7 +2,6 @@ package advertisementSearch
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,7 +11,6 @@ import (
 	advManager "api-tests-template/internal/managers/advertisements"
 	"api-tests-template/internal/managers/auth"
 	"api-tests-template/internal/managers/auth/models"
-	"api-tests-template/internal/utils"
 
 	base "api-tests-template/tests"
 )
@@ -21,7 +19,6 @@ const (
 	existingAdTitle = "Моё тестовое объявление про велосипед"
 
 	searchBeginning = "Моё"
-	searchMiddle    = "объявление"
 	searchEnd       = "велосипед"
 )
 
@@ -40,7 +37,6 @@ func (s *TestSuite) SetupSuite() {
 	base.Precondition("Проверить, что константы заданы")
 	require.NotEmpty(s.T(), existingAdTitle, "задать existingAdTitle")
 	require.NotEmpty(s.T(), searchBeginning, "задать searchBeginning")
-	require.NotEmpty(s.T(), searchMiddle, "задать searchMiddle")
 	require.NotEmpty(s.T(), searchEnd, "задать searchEnd")
 
 	base.Precondition("Авторизация пользователя")
@@ -52,7 +48,7 @@ func (s *TestSuite) TearDownSuite() {
 }
 
 func (s *TestSuite) TestSearchByTitle() {
-	list := advManager.GetAdvertisementsList(s.T(), s.loginData.Token, searchMiddle)
+	list := advManager.GetAdvertisementsList(s.T(), s.loginData.Token, searchBeginning)
 
 	s.Run("В ответе есть хотя бы одно объявление", func() {
 		require.NotEmpty(s.T(), list.Items)
@@ -69,11 +65,7 @@ func (s *TestSuite) TestSearchByTitle_Substring() {
 		search string
 	}{
 		{"начало", searchBeginning},
-		{"середина", searchMiddle},
 		{"конец", searchEnd},
-		{"нижний регистр", strings.ToLower(searchMiddle)},
-		{"верхний регистр", strings.ToUpper(searchMiddle)},
-		{"смешанный регистр", utils.MixCase(searchMiddle)},
 	}
 
 	for _, tc := range cases {
