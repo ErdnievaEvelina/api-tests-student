@@ -144,7 +144,7 @@ func (s *TestSuite) TestCreateAdvertisementUnauthorized() {
 
 		errResp := adManager.ParseErrorResponse(s.T(), raw)
 		require.Equal(s.T(), "unauthorized", errResp.Error, "Ожидался unauthorized")
-		require.Contains(s.T(), "Authorization header required", errResp.Message)
+		require.Contains(s.T(), errResp.Message, "Authorization header required")
 	})
 
 	s.Run("С неверным токеном", func() {
@@ -152,6 +152,6 @@ func (s *TestSuite) TestCreateAdvertisementUnauthorized() {
 		errResp := adManager.ParseErrorResponse(s.T(), raw)
 		require.Equal(s.T(), http.StatusUnauthorized, raw.StatusCode, "Ожидалась ошибка авторизации (401)")
 		require.Equal(s.T(), "unauthorized", errResp.Error, "Ожидался unauthorized")
-		require.Contains(s.T(), "Invalid or expired token", errResp.Message, "Ожидался Invalid or expired token")
+		require.Contains(s.T(), errResp.Message, "Invalid or expired token", "Ожидался Invalid or expired token")
 	})
 }
